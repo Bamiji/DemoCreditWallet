@@ -64,12 +64,16 @@ describe('userCreate function', () => {
             const res = await request(app).post('/api/v1/user').send(reqBody);
             expect(res.status).toBe(201);
             expect(res.body).toEqual(resBody);
-            const rows = await knex('users').where({
+            const userRows = await knex('users').where({
                 email: reqBody.email,
                 first_name: reqBody.firstName,
                 last_name: reqBody.lastName,
             });
-            expect(rows.length).toBe(1);
+            expect(userRows.length).toBe(1);
+            const walletRows = await knex('wallets').where({
+                fk_user_id: userRows[0].id,
+            });
+            expect(walletRows.length).toBe(1);
         });
 
         test('duplicate insert', async () => {
@@ -84,14 +88,14 @@ describe('userCreate function', () => {
             const res = await request(app).post('/api/v1/user').send(reqBody);
             expect(res.status).toBe(400);
             expect(res.body).toEqual(resBody);
-            const rows = await knex('users')
+            const userRows = await knex('users')
                 .where({
                     email: reqBody.email,
                     first_name: reqBody.firstName,
                     last_name: reqBody.lastName,
                 })
                 .select('id');
-            expect(rows.length).toBe(0);
+            expect(userRows.length).toBe(0);
         });
 
         test('non-email duplicates', async () => {
@@ -106,14 +110,18 @@ describe('userCreate function', () => {
             const res = await request(app).post('/api/v1/user').send(reqBody);
             expect(res.status).toBe(201);
             expect(res.body).toEqual(resBody);
-            const rows = await knex('users')
+            const userRows = await knex('users')
                 .where({
                     email: reqBody.email,
                     first_name: reqBody.firstName,
                     last_name: reqBody.lastName,
                 })
                 .select('id');
-            expect(rows.length).toBe(1);
+            expect(userRows.length).toBe(1);
+            const walletRows = await knex('wallets').where({
+                fk_user_id: userRows[0].id,
+            });
+            expect(walletRows.length).toBe(1);
         });
     });
 });
