@@ -31,6 +31,20 @@ export async function userCreate(req, res) {
             return;
         }
 
+        const karmaResponse = await fetch(`https://adjutor.lendsqr.com/v2/verification/karma/${req.body.email}`, {
+            headers: {
+                Authorization: `Bearer ${process.env.ADJUTOR_TOKEN}`,
+            },
+        });
+
+        const karmaResponseJson = await karmaResponse.json();
+        const badKarmaStatus = karmaResponseJson.status;
+        if (badKarmaStatus === 'success') {
+            // Disabled because it always returns 'success' for test mode
+            //res.status(403).json({ error: 'You have been blacklisted' });
+            //return;
+        }
+
         // Database Insert
         try {
             await knex.transaction(async (trx) => {
