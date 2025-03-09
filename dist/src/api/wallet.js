@@ -48,6 +48,31 @@ export async function walletDeposit(req, res) {
         console.log(error);
     }
 }
+export async function walletGet(req, res) {
+    try {
+        const user = await knex('users')
+            .where({
+            email: req.user.email,
+        })
+            .select('id');
+        if (user.length === 0) {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
+        const userId = user[0].id;
+        let balance = await knex('wallets')
+            .where({
+            fk_user_id: userId,
+        })
+            .first('balance');
+        balance = Number(balance.balance).toFixed(2);
+        res.json({ balance });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+        console.log(error);
+    }
+}
 export async function walletWithdraw(req, res) {
     try {
         await checkSchema(walletDepositWithdrawSchema).run(req);

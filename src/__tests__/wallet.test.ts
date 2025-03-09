@@ -196,3 +196,60 @@ describe('walletWithdraw function', () => {
         expect(res.body).toEqual(resBody);
     });
 });
+
+describe('walletGet function', () => {
+    const endpoint = '/api/v1/wallet';
+    const loginEndpoint = '/api/v1/user/login';
+
+    test.each([{}, { authorization: '' }, { authorization: 'wrong' }])(
+        "confirm it's a protected endpoint: %s",
+        async (authObj) => {
+            const res = await request(app).get(endpoint).set(authObj);
+
+            expect(res.status).toBe(401);
+            expect(res.body).toEqual({ error: 'Unauthorized' });
+        },
+    );
+
+    test('nonexistent user', async () => {
+        const seedUser = { email: 'notaseed@mail.com' };
+        const resBody = { error: 'Invalid credentials' };
+
+        const res = await request(app)
+            .get(endpoint)
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) });
+
+        expect(res.status).toBe(401);
+        expect(res.body).toEqual(resBody);
+    });
+
+    test('accurate checks', async () => {
+        const seedUsers = [
+            { email: 'seed@mail.com', id: 1, password: 'password' },
+            { email: 'seed2@mail.com', id: 2, password: 'password2' },
+        ];
+
+        const balances = [];
+        for (const seedUser of seedUsers) {
+            const loginRes = await request(app).post(loginEndpoint).send(seedUser);
+            const token = loginRes.body.token;
+
+            let balance = await knex('wallets')
+                .where({
+                    fk_user_id: seedUser.id,
+                })
+                .first('balance');
+
+            balance = Number(balance.balance).toFixed(2);
+            balances.push(balance);
+
+            const resBody = { balance };
+
+            const res = await request(app).get(endpoint).set({ authorization: token });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(resBody);
+        }
+        expect(balances[0]).not.toBe(balances[1]);
+    });
+});
