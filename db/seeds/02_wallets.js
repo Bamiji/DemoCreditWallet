@@ -13,5 +13,13 @@ export const seed = async function (knex) {
             balance: 100000,
             fk_user_id: 2,
         },
+        {
+            balance: 500000000000000,
+            fk_user_id: 3,
+        },
+        {
+            balance: 500000000000000,
+            fk_user_id: 4,
+        },
     ]);
 };

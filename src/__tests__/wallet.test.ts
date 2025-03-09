@@ -35,7 +35,7 @@ describe('walletDeposit function', () => {
         expect(res.body).toEqual(resBody);
     });
 
-    test.each([{}, { amount: '9,.0' }, { amount: 'english' }, { amount: '-1' }, { amount: '' }])(
+    test.each([{}, { amount: '0' }, { amount: 'english' }, { amount: '-1' }, { amount: '' }])(
         'invalid amount: %s',
         async (amountObj) => {
             const seedUser = { email: 'seed@mail.com', id: 1, password: 'password' };
@@ -90,7 +90,7 @@ describe('walletDeposit function', () => {
         const token = loginRes.body.token;
 
         const reqBody = {
-            amount: '999999999999999.9999',
+            amount: '9999999999999999.9999',
         };
         const resBody = { error: 'Deposit would exceed account limit' };
 
@@ -131,7 +131,7 @@ describe('walletWithdraw function', () => {
         expect(res.body).toEqual(resBody);
     });
 
-    test.each([{}, { amount: '9,.0' }, { amount: 'english' }, { amount: '-1' }, { amount: '' }])(
+    test.each([{}, { amount: '0' }, { amount: 'english' }, { amount: '-1' }, { amount: '' }])(
         'invalid amount: %s',
         async (amountObj) => {
             const seedUser = { email: 'seed@mail.com', id: 1, password: 'password' };
@@ -251,5 +251,138 @@ describe('walletGet function', () => {
             expect(res.body).toEqual(resBody);
         }
         expect(balances[0]).not.toBe(balances[1]);
+    });
+});
+
+describe('walletTransfer function', () => {
+    const endpoint = '/api/v1/wallet/transfer';
+    const loginEndpoint = '/api/v1/user/login';
+
+    test.each([{}, { authorization: '' }, { authorization: 'wrong' }])(
+        "confirm it's a protected endpoint: %s",
+        async (authObj) => {
+            const res = await request(app).post(endpoint).set(authObj);
+
+            expect(res.status).toBe(401);
+            expect(res.body).toEqual({ error: 'Unauthorized' });
+        },
+    );
+
+    test('nonexistent user', async () => {
+        const seedUser = { email: 'notaseed@mail.com' };
+        const reqBody = {
+            amount: '1000',
+            recipientEmail: 'recipient@emai.com',
+        };
+        const resBody = { error: 'Invalid credentials' };
+
+        const res = await request(app)
+            .post(endpoint)
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) })
+            .send(reqBody);
+
+        expect(res.status).toBe(401);
+        expect(res.body).toEqual(resBody);
+    });
+
+    test.each([
+        [{}, ['Invalid amount', 'Invalid recipient email address']],
+        [{ amount: '0' }, ['Invalid amount', 'Invalid recipient email address']],
+        [{ amount: 'english' }, ['Invalid amount', 'Invalid recipient email address']],
+        [{ amount: '-1' }, ['Invalid amount', 'Invalid recipient email address']],
+        [{ amount: '' }, ['Invalid amount', 'Invalid recipient email address']],
+        [{ amount: '9.0', recipientEmail: '' }, ['Invalid recipient email address']],
+        [{ amount: '9.0', recipientEmail: 'rmail' }, ['Invalid recipient email address']],
+    ])('invalid transfer: %s', async (transferObj, errorList) => {
+        const seedUser = { email: 'seed@mail.com', id: 1, password: 'password' };
+        const loginRes = await request(app).post(loginEndpoint).send(seedUser);
+        const token = loginRes.body.token;
+
+        const reqBody = transferObj;
+        const resBody = { errors: errorList };
+
+        const res = await request(app).post(endpoint).set({ authorization: token }).send(reqBody);
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual(resBody);
+    });
+
+    test('successful transfer', async () => {
+        const seedSendingUser = { email: 'seed3@mail.com', id: 3, password: 'password3' };
+        const seedReceivingUser = { email: 'seed4@mail.com', id: 4 };
+        const loginRes = await request(app).post(loginEndpoint).send(seedSendingUser);
+        const token = loginRes.body.token;
+
+        let wallet = await knex('wallets')
+            .where({
+                fk_user_id: seedSendingUser.id,
+            })
+            .select('balance')
+            .first();
+        expect(wallet.balance).toBe('500000000000000.0000');
+
+        // test transfer to same user
+        let res = await request(app).post(endpoint).set({ authorization: token }).send({
+            amount: '1',
+            recipientEmail: seedSendingUser.email,
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Cannot transfer to the same user' });
+
+        // test transfer to nonexistent user
+        res = await request(app)
+            .post(endpoint)
+            .set({ authorization: token })
+            .send({
+                amount: '1',
+                recipientEmail: 'not' + seedSendingUser.email,
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Recipient is not in the system' });
+
+        // test transfer with insufficient funds
+        res = await request(app).post(endpoint).set({ authorization: token }).send({
+            amount: '500000000000001',
+            recipientEmail: seedReceivingUser.email,
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: 'Insufficient balance for transfer' });
+
+        // test transfer that would exceed account limit
+        res = await request(app).post(endpoint).set({ authorization: token }).send({
+            amount: '500000000000000',
+            recipientEmail: seedReceivingUser.email,
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: "Transfer would exceed recipient's account limit" });
+
+        // test successful transfer
+        res = await request(app).post(endpoint).set({ authorization: token }).send({
+            amount: '499999999999999',
+            recipientEmail: seedReceivingUser.email,
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ message: 'Transfer successful' });
+
+        wallet = await knex('wallets')
+            .where({
+                fk_user_id: seedSendingUser.id,
+            })
+            .select('balance')
+            .first();
+        expect(wallet.balance).toBe('1.0000');
+
+        wallet = await knex('wallets')
+            .where({
+                fk_user_id: seedReceivingUser.id,
+            })
+            .select('balance')
+            .first();
+        expect(wallet.balance).toBe('999999999999999.0000');
     });
 });
