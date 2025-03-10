@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { checkSchema, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import knex from '../../db/db.js';
+import fetch from 'node-fetch';
+import knex from '../db/db.js';
 const newUserSchema = {
     email: { errorMessage: 'Invalid email address', isEmail: true },
     firstName: { errorMessage: 'First name cannot be empty', notEmpty: true },
@@ -19,7 +20,7 @@ export async function userCreate(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList = [];
-            for (const error of errors.errors) {
+            for (const error of errors.array()) {
                 errorList.push(error.msg);
             }
             res.status(400).json({ errors: errorList });
@@ -27,12 +28,12 @@ export async function userCreate(req, res) {
         }
         const karmaResponse = await fetch(`https://adjutor.lendsqr.com/v2/verification/karma/${req.body.email}`, {
             headers: {
-                Authorization: `Bearer ${process.env.ADJUTOR_TOKEN}`,
+                Authorization: `Bearer ${process.env.ADJUTOR_TOKEN ?? ''}`,
             },
         });
-        const karmaResponseJson = await karmaResponse.json();
+        const karmaResponseJson = (await karmaResponse.json());
         const badKarmaStatus = karmaResponseJson.status;
-        if (badKarmaStatus === 'success') {
+        if (badKarmaStatus.status === 'success') {
             // Disabled because it always returns 'success' for test mode
             //res.status(403).json({ error: 'You have been blacklisted' });
             //return;
@@ -77,7 +78,7 @@ export async function userLogin(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList = [];
-            for (const error of errors.errors) {
+            for (const error of errors.array()) {
                 errorList.push(error.msg);
             }
             res.status(400).json({ errors: errorList });
@@ -98,10 +99,10 @@ export async function userLogin(req, res) {
             res.status(401).json({ error: 'Invalid credentials' });
             return;
         }
-        const token = jwt.sign({ email: req.body.email }, process.env.TOKEN_SECRET);
+        const token = jwt.sign({ email: req.body.email }, process.env.TOKEN_SECRET ?? 'test');
         res.status(200).json({ token });
     }
-    catch (error) {
+    catch {
         res.status(500).json({ error: 'Internal server error' });
     }
 }

@@ -1,7 +1,8 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { checkSchema, validationResult } from 'express-validator';
 
-import knex from '../../db/db.js';
+import knex from '../db/db.js';
+import { CustomRequest } from '../middleware/auth.js';
 
 const walletDepositWithdrawSchema = {
     amount: { errorMessage: 'Invalid amount', isFloat: { options: { gt: 0 } } },
@@ -11,7 +12,7 @@ const walletTransferSchema = {
     recipientEmail: { errorMessage: 'Invalid recipient email address', isEmail: true },
 };
 
-export async function walletDeposit(req, res) {
+export async function walletDeposit(req: CustomRequest, res: Response) {
     try {
         await checkSchema(walletDepositWithdrawSchema).run(req);
         const errors = validationResult(req);
@@ -19,14 +20,19 @@ export async function walletDeposit(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList: string[] = [];
-            for (const error of errors.errors) {
-                errorList.push(error.msg);
+            for (const error of errors.array()) {
+                errorList.push(error.msg as string);
             }
             res.status(400).json({ errors: errorList });
             return;
         }
 
         const amount = Number(req.body.amount).toFixed(4);
+
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
 
         const user = await knex('users')
             .where({
@@ -47,7 +53,7 @@ export async function walletDeposit(req, res) {
                     fk_user_id: userId,
                 })
                 .increment('balance', amount);
-        } catch (error) {
+        } catch (error: any) {
             if (error.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
                 res.status(400).json({ error: 'Deposit would exceed account limit' });
                 return;
@@ -61,8 +67,13 @@ export async function walletDeposit(req, res) {
     }
 }
 
-export async function walletGet(req, res) {
+export async function walletGet(req: CustomRequest, res: Response) {
     try {
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
+
         const user = await knex('users')
             .where({
                 email: req.user.email,
@@ -91,7 +102,7 @@ export async function walletGet(req, res) {
     }
 }
 
-export async function walletTransfer(req: Request, res: Response) {
+export async function walletTransfer(req: CustomRequest, res: Response) {
     try {
         await checkSchema(walletTransferSchema).run(req);
         const errors = validationResult(req);
@@ -99,8 +110,8 @@ export async function walletTransfer(req: Request, res: Response) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList: string[] = [];
-            for (const error of errors.errors) {
-                errorList.push(error.msg);
+            for (const error of errors.array()) {
+                errorList.push(error.msg as string);
             }
             res.status(400).json({ errors: errorList });
             return;
@@ -109,6 +120,11 @@ export async function walletTransfer(req: Request, res: Response) {
         const amount = Number(req.body.amount).toFixed(4);
 
         // Gather participating users
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
+
         const sendingUser = await knex('users')
             .where({
                 email: req.user.email,
@@ -161,7 +177,7 @@ export async function walletTransfer(req: Request, res: Response) {
             if (succesfulTrx) {
                 res.json({ message: 'Transfer successful' });
             }
-        } catch (error) {
+        } catch (error: any) {
             if (error.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
                 res.status(400).json({ error: "Transfer would exceed recipient's account limit" });
                 return;
@@ -174,7 +190,7 @@ export async function walletTransfer(req: Request, res: Response) {
     }
 }
 
-export async function walletWithdraw(req, res) {
+export async function walletWithdraw(req: CustomRequest, res: Response) {
     try {
         await checkSchema(walletDepositWithdrawSchema).run(req);
         const errors = validationResult(req);
@@ -182,14 +198,19 @@ export async function walletWithdraw(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList: string[] = [];
-            for (const error of errors.errors) {
-                errorList.push(error.msg);
+            for (const error of errors.array()) {
+                errorList.push(error.msg as string);
             }
             res.status(400).json({ errors: errorList });
             return;
         }
 
         const amount = Number(req.body.amount).toFixed(4);
+
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
 
         const user = await knex('users')
             .where({

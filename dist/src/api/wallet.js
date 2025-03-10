@@ -1,5 +1,5 @@
 import { checkSchema, validationResult } from 'express-validator';
-import knex from '../../db/db.js';
+import knex from '../db/db.js';
 const walletDepositWithdrawSchema = {
     amount: { errorMessage: 'Invalid amount', isFloat: { options: { gt: 0 } } },
 };
@@ -14,13 +14,17 @@ export async function walletDeposit(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList = [];
-            for (const error of errors.errors) {
+            for (const error of errors.array()) {
                 errorList.push(error.msg);
             }
             res.status(400).json({ errors: errorList });
             return;
         }
         const amount = Number(req.body.amount).toFixed(4);
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
         const user = await knex('users')
             .where({
             email: req.user.email,
@@ -54,6 +58,10 @@ export async function walletDeposit(req, res) {
 }
 export async function walletGet(req, res) {
     try {
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
         const user = await knex('users')
             .where({
             email: req.user.email,
@@ -84,7 +92,7 @@ export async function walletTransfer(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList = [];
-            for (const error of errors.errors) {
+            for (const error of errors.array()) {
                 errorList.push(error.msg);
             }
             res.status(400).json({ errors: errorList });
@@ -92,6 +100,10 @@ export async function walletTransfer(req, res) {
         }
         const amount = Number(req.body.amount).toFixed(4);
         // Gather participating users
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
         const sendingUser = await knex('users')
             .where({
             email: req.user.email,
@@ -160,13 +172,17 @@ export async function walletWithdraw(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList = [];
-            for (const error of errors.errors) {
+            for (const error of errors.array()) {
                 errorList.push(error.msg);
             }
             res.status(400).json({ errors: errorList });
             return;
         }
         const amount = Number(req.body.amount).toFixed(4);
+        if (req.user === undefined || typeof req.user === 'string') {
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+        }
         const user = await knex('users')
             .where({
             email: req.user.email,

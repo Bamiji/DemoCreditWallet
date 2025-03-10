@@ -2,8 +2,8 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { describe, expect, test } from 'vitest';
 
-import knex from '../../db/db.js';
 import { app } from '../app.js';
+import knex from '../db/db.js';
 
 describe('walletDeposit function', () => {
     const endpoint = '/api/v1/wallet/deposit';
@@ -28,7 +28,7 @@ describe('walletDeposit function', () => {
 
         const res = await request(app)
             .post(endpoint)
-            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) })
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET ?? 'test') })
             .send(reqBody);
 
         expect(res.status).toBe(401);
@@ -124,7 +124,7 @@ describe('walletWithdraw function', () => {
 
         const res = await request(app)
             .post(endpoint)
-            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) })
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET ?? 'test') })
             .send(reqBody);
 
         expect(res.status).toBe(401);
@@ -217,7 +217,7 @@ describe('walletGet function', () => {
 
         const res = await request(app)
             .get(endpoint)
-            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) });
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET ?? 'test') });
 
         expect(res.status).toBe(401);
         expect(res.body).toEqual(resBody);
@@ -278,7 +278,7 @@ describe('walletTransfer function', () => {
 
         const res = await request(app)
             .post(endpoint)
-            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET) })
+            .set({ authorization: jwt.sign({ email: seedUser.email }, process.env.TOKEN_SECRET ?? 'test') })
             .send(reqBody);
 
         expect(res.status).toBe(401);

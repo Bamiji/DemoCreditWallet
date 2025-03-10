@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
+import { Request, Response } from 'express';
 import { checkSchema, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
+import fetch from 'node-fetch';
 
-import knex from '../../db/db.js';
+import knex from '../db/db.js';
 
 const newUserSchema = {
     email: { errorMessage: 'Invalid email address', isEmail: true },
@@ -16,7 +18,7 @@ const userLoginSchema = {
     password: { errorMessage: 'Password cannot be empty', notEmpty: true },
 };
 
-export async function userCreate(req, res) {
+export async function userCreate(req: Request, res: Response) {
     try {
         await checkSchema(newUserSchema).run(req);
         const errors = validationResult(req);
@@ -24,8 +26,8 @@ export async function userCreate(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList: string[] = [];
-            for (const error of errors.errors) {
-                errorList.push(error.msg);
+            for (const error of errors.array()) {
+                errorList.push(error.msg as string);
             }
             res.status(400).json({ errors: errorList });
             return;
@@ -33,13 +35,13 @@ export async function userCreate(req, res) {
 
         const karmaResponse = await fetch(`https://adjutor.lendsqr.com/v2/verification/karma/${req.body.email}`, {
             headers: {
-                Authorization: `Bearer ${process.env.ADJUTOR_TOKEN}`,
+                Authorization: `Bearer ${process.env.ADJUTOR_TOKEN ?? ''}`,
             },
         });
 
-        const karmaResponseJson = await karmaResponse.json();
+        const karmaResponseJson = (await karmaResponse.json()) as any;
         const badKarmaStatus = karmaResponseJson.status;
-        if (badKarmaStatus === 'success') {
+        if (badKarmaStatus.status === 'success') {
             // Disabled because it always returns 'success' for test mode
             //res.status(403).json({ error: 'You have been blacklisted' });
             //return;
@@ -64,7 +66,7 @@ export async function userCreate(req, res) {
                     },
                 ]);
             });
-        } catch (error) {
+        } catch (error: any) {
             if (error.code === 'ER_DUP_ENTRY') {
                 res.status(400).json({ error: 'Email already exists' });
                 return;
@@ -79,7 +81,7 @@ export async function userCreate(req, res) {
     }
 }
 
-export async function userLogin(req, res) {
+export async function userLogin(req: Request, res: Response) {
     try {
         await checkSchema(userLoginSchema).run(req);
         const errors = validationResult(req);
@@ -87,8 +89,8 @@ export async function userLogin(req, res) {
         // Body Validation
         if (!errors.isEmpty()) {
             const errorList: string[] = [];
-            for (const error of errors.errors) {
-                errorList.push(error.msg);
+            for (const error of errors.array()) {
+                errorList.push(error.msg as string);
             }
             res.status(400).json({ errors: errorList });
             return;
@@ -113,10 +115,10 @@ export async function userLogin(req, res) {
             return;
         }
 
-        const token = jwt.sign({ email: req.body.email }, process.env.TOKEN_SECRET);
+        const token = jwt.sign({ email: req.body.email }, process.env.TOKEN_SECRET ?? 'test');
 
         res.status(200).json({ token });
-    } catch (error) {
+    } catch {
         res.status(500).json({ error: 'Internal server error' });
     }
 }

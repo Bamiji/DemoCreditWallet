@@ -1,8 +1,8 @@
 import request from 'supertest';
 import { describe, expect, test } from 'vitest';
 
-import knex from '../../db/db.js';
 import { app } from '../app.js';
+import knex from '../db/db.js';
 
 describe('userCreate function', () => {
     describe('test request validation', () => {
