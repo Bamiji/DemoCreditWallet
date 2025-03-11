@@ -99,7 +99,7 @@ The amount to be withdrawn is required as a positive number, but can also be sen
 #### Funds Transfer
 
 ```http
-  POST /api/v1/wallet/withdraw
+  POST /api/v1/wallet/transfer
 ```
 
 Requires token in Authorization header.
